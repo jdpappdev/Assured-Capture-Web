@@ -1,0 +1,145 @@
+{
+  "entities": {
+    "Report": {
+      "title": "Report",
+      "description": "Inspection report for a field job",
+      "type": "object",
+      "properties": {
+        "jobReference": {
+          "type": "string",
+          "description": "Job reference code starting with BBC-[YY]-",
+          "maxLength": 64
+        },
+        "reportName": {
+          "type": "string",
+          "description": "Name or title of the inspection report",
+          "maxLength": 200
+        },
+        "clientName": {
+          "type": "string",
+          "description": "Name of the client",
+          "maxLength": 200
+        },
+        "address": {
+          "type": "string",
+          "description": "Inspection site address",
+          "maxLength": 500
+        },
+        "reportDate": {
+          "type": "string",
+          "description": "ISO date string of the report creation/target date"
+        },
+        "status": {
+          "type": "string",
+          "description": "Status of the report",
+          "enum": ["Draft", "In Progress", "Awaiting Review", "Completed", "Sent to Client"]
+        },
+        "inspectionDate": {
+          "type": "string",
+          "description": "Current inspection date"
+        },
+        "inspectionDateHistory": {
+          "type": "array",
+          "description": "Append-only history of previous inspection dates with changedAt timestamps"
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the inspector who created the report",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["jobReference", "status", "reportDate", "inspectionDate"]
+    },
+    "Issue": {
+      "title": "Issue",
+      "description": "Inspection issue within a report",
+      "type": "object",
+      "properties": {
+        "issueNumber": {
+          "type": "number",
+          "description": "Permanent sequential integer within the report"
+        },
+        "issueName": {
+          "type": "string",
+          "description": "Title or short name of the issue",
+          "maxLength": 200
+        },
+        "issueDescription": {
+          "type": "string",
+          "description": "Detailed description of the issue",
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["issueNumber"]
+    },
+    "Photo": {
+      "title": "Photo",
+      "description": "Photo record belonging to an issue",
+      "type": "object",
+      "properties": {
+        "imageFile": {
+          "type": "string",
+          "description": "Firebase Storage reference path or download URL",
+          "maxLength": 2048
+        },
+        "description": {
+          "type": "string",
+          "description": "Description entered via typing or voice transcription",
+          "maxLength": 2000
+        },
+        "isReferenceImage": {
+          "type": "boolean",
+          "description": "Whether this photo is marked as a reference image"
+        },
+        "issueNumber": {
+          "type": "number",
+          "description": "Denormalized issue number copied from parent issue"
+        },
+        "jobReference": {
+          "type": "string",
+          "description": "Denormalized job reference copied from parent report",
+          "maxLength": 64
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp of creation"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        }
+      },
+      "required": ["imageFile", "issueNumber", "jobReference"]
+    }
+  },
+  "firestore": {
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Field inspection reports"
+    },
+    "/reports/{reportId}/issues/{issueId}": {
+      "schema": "Issue",
+      "description": "Issues for a specific report"
+    },
+    "/reports/{reportId}/issues/{issueId}/photos/{photoId}": {
+      "schema": "Photo",
+      "description": "Photos for a specific issue"
+    }
+  }
+}
