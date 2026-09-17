@@ -7,12 +7,10 @@ import {
   FileText,
   AlertCircle,
   LogOut,
-  Sparkles,
 } from 'lucide-react';
 import type { Report } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { createReport } from '../services/reportService';
-import { seedDemoReports } from '../services/seedService';
 import { loginWithGoogle, logoutUser, type User } from '../firebase';
 
 interface ReportsHomeScreenProps {
@@ -20,7 +18,7 @@ interface ReportsHomeScreenProps {
   isLoading: boolean;
   error: string | null;
   currentUser: User | null;
-  onOpenReport: (reportId: string) => void;
+  onOpenReport: (reportId: string, isNew?: boolean) => void;
 }
 
 export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
@@ -33,32 +31,18 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [isSeeding, setIsSeeding] = useState(false);
 
   const handleCreateReport = async () => {
     setIsCreating(true);
     setCreateError(null);
     try {
       const newReport = await createReport(currentUser?.uid);
-      onOpenReport(newReport.id);
+      onOpenReport(newReport.id, true);
     } catch (err: any) {
       console.error('Error creating report:', err);
       setCreateError('Failed to create new report. Please check your network connection.');
     } finally {
       setIsCreating(false);
-    }
-  };
-
-  const handleLoadDemoReports = async () => {
-    setIsSeeding(true);
-    setCreateError(null);
-    try {
-      await seedDemoReports(currentUser?.uid);
-    } catch (err: any) {
-      console.error('Error adding demo reports:', err);
-      setCreateError('Failed to add demo reports. Please check your connection.');
-    } finally {
-      setIsSeeding(false);
     }
   };
 
@@ -239,16 +223,6 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
               <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
                 {filteredReports.length} {filteredReports.length === 1 ? 'Report' : 'Reports'}
               </span>
-              <button
-                type="button"
-                onClick={handleLoadDemoReports}
-                disabled={isSeeding}
-                className="text-xs font-bold text-stone-600 hover:text-blue-700 flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer"
-                title="Populate complete demo reports with attached photos"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                <span>{isSeeding ? 'Loading Demos...' : 'Load Demo Reports'}</span>
-              </button>
             </div>
           )}
 
@@ -264,26 +238,15 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
                   ? `No inspection reports match "${searchQuery}". Clear your search or create a new report.`
                   : 'Start a photo inspection report to document site conditions and issues.'}
               </p>
-              <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="mt-6 flex items-center justify-center">
                 <button
                   type="button"
                   onClick={handleCreateReport}
-                  disabled={isCreating || isSeeding}
-                  className="w-full sm:w-auto min-h-[50px] px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-base shadow-sm inline-flex items-center justify-center"
+                  disabled={isCreating}
+                  className="w-full sm:w-auto min-h-[50px] px-8 py-3 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-xl font-bold text-base shadow-sm inline-flex items-center justify-center cursor-pointer transition-colors"
                   id="empty-new-report-btn"
                 >
                   <span>New Report</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleLoadDemoReports}
-                  disabled={isCreating || isSeeding}
-                  className="w-full sm:w-auto min-h-[50px] px-5 py-3 bg-white hover:bg-stone-50 border-2 border-stone-300 text-stone-700 rounded-xl font-bold text-sm shadow-xs inline-flex items-center justify-center gap-2"
-                  id="empty-load-demo-btn"
-                >
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>{isSeeding ? 'Loading Demo Reports...' : 'Add Demo Reports'}</span>
                 </button>
               </div>
             </div>

@@ -11,7 +11,6 @@ import {
   subscribeIssues,
   subscribePhotos,
 } from './services/reportService';
-import { seedDemoReports } from './services/seedService';
 import { ReportsHomeScreen } from './screens/ReportsHomeScreen';
 import { ReportDetailScreen } from './screens/ReportDetailScreen';
 import { AddIssueScreen } from './screens/AddIssueScreen';
@@ -22,6 +21,7 @@ export default function App() {
   // Navigation State
   const [currentScreen, setCurrentScreen] = useState<ScreenName>('reports_home');
   const [activeReportId, setActiveReportId] = useState<string | null>(null);
+  const [isCreatingNewReport, setIsCreatingNewReport] = useState<boolean>(false);
   const [activeIssueId, setActiveIssueId] = useState<string | null>(null);
   const [activePhotoId, setActivePhotoId] = useState<string | null>(null);
 
@@ -47,26 +47,15 @@ export default function App() {
     return () => unsubAuth();
   }, []);
 
-  // 2. Subscribe to Reports collection and auto-seed demo reports if empty
+  // 2. Subscribe to Reports collection
   useEffect(() => {
     setIsLoadingReports(true);
-    let hasCheckedForSeed = false;
 
     const unsubscribe = subscribeReports(
-      async (fetchedReports) => {
+      (fetchedReports) => {
         setReports(fetchedReports);
         setIsLoadingReports(false);
         setReportsError(null);
-
-        // If the database has 0 reports, automatically seed the two complete demo reports with photos
-        if (!hasCheckedForSeed && fetchedReports.length === 0) {
-          hasCheckedForSeed = true;
-          try {
-            await seedDemoReports(currentUser?.uid);
-          } catch (seedErr) {
-            console.warn('Initial demo seed notice:', seedErr);
-          }
-        }
       },
       (err) => {
         console.error('Reports subscription error:', err);
@@ -76,7 +65,7 @@ export default function App() {
     );
 
     return () => unsubscribe();
-  }, [currentUser]);
+  }, []);
 
   // 3. Subscribe to Issues if inside a Report
   useEffect(() => {
@@ -112,8 +101,9 @@ export default function App() {
   const activePhoto = activeIssuePhotos.find((p) => p.id === activePhotoId) || null;
 
   // Navigation handlers
-  const handleOpenReport = (reportId: string) => {
+  const handleOpenReport = (reportId: string, isNew: boolean = false) => {
     setActiveReportId(reportId);
+    setIsCreatingNewReport(isNew);
     setActiveIssueId(null);
     setActivePhotoId(null);
     setCurrentScreen('report_detail');
@@ -183,9 +173,14 @@ export default function App() {
       {currentScreen === 'report_detail' && activeReport && (
         <ReportDetailScreen
           report={activeReport}
+          isNewReport={isCreatingNewReport}
           onBack={handleBackToReports}
           onOpenIssue={handleOpenIssue}
           onNavigateToAddIssue={handleNavigateToAddIssue}
+          onReportSaved={() => {
+            setIsCreatingNewReport(false);
+            handleNavigateToAddIssue();
+          }}
           onReportDeleted={handleBackToReports}
         />
       )}

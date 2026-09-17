@@ -23,17 +23,21 @@ import {
 
 interface ReportDetailScreenProps {
   report: Report;
+  isNewReport?: boolean;
   onBack: () => void;
   onOpenIssue: (issueId: string) => void;
   onNavigateToAddIssue: () => void;
+  onReportSaved?: () => void;
   onReportDeleted: () => void;
 }
 
 export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
   report,
+  isNewReport = false,
   onBack,
   onOpenIssue,
   onNavigateToAddIssue,
+  onReportSaved,
   onReportDeleted,
 }) => {
   // Form State
@@ -116,6 +120,11 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
       );
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+
+      // If this report was just created, save and navigate straight to the Add Issue page
+      if (isNewReport && onReportSaved) {
+        onReportSaved();
+      }
     } catch (err: any) {
       console.error('Save report failed:', err);
       setSaveError(
@@ -363,100 +372,102 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
         </div>
       </div>
 
-      {/* ISSUES SECTION */}
-      <div className="mt-8">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight flex items-center gap-2">
-              <Layers className="w-6 h-6 text-stone-700" />
-              <span>Inspection Issues</span>
-            </h2>
-            <p className="text-xs text-stone-500 font-medium">
-              Permanent sequential issue tracking for field inspection
-            </p>
-          </div>
-          <span className="px-3 py-1 bg-stone-200 text-stone-800 rounded-lg text-xs font-bold">
-            {issues.length} {issues.length === 1 ? 'Issue' : 'Issues'}
-          </span>
-        </div>
-
-        {/* Full-Width Add Issue Button (Navigates to separate page) */}
-        <button
-          type="button"
-          onClick={onNavigateToAddIssue}
-          id="add-issue-btn"
-          className="w-full min-h-[56px] px-6 py-3.5 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-xl font-extrabold text-base tracking-wide shadow-md transition-all flex items-center justify-center border-2 border-blue-800 active:scale-[0.99] cursor-pointer"
-        >
-          <span>Add Issue</span>
-        </button>
-
-        {/* Issues List */}
-        <div className="mt-4 space-y-3">
-          {isLoadingIssues ? (
-            <div className="py-8 text-center text-stone-500">
-              <div className="w-6 h-6 border-2 border-blue-700 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-              <p className="text-sm font-semibold">Loading issues...</p>
-            </div>
-          ) : issues.length === 0 ? (
-            <div className="py-10 px-4 text-center bg-stone-100 border-2 border-dashed border-stone-300 rounded-2xl">
-              <Layers className="w-10 h-10 text-stone-400 mx-auto mb-2" />
-              <h4 className="text-lg font-bold text-stone-800">No issues added yet</h4>
-              <p className="text-xs text-stone-600 mt-1 max-w-xs mx-auto">
-                Tap the "Add Issue" button above to record findings, defects, and photos.
+      {/* ISSUES SECTION (Hidden when creating a new report until report information is saved) */}
+      {!isNewReport && (
+        <div className="mt-8">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight flex items-center gap-2">
+                <Layers className="w-6 h-6 text-stone-700" />
+                <span>Inspection Issues</span>
+              </h2>
+              <p className="text-xs text-stone-500 font-medium">
+                Permanent sequential issue tracking for field inspection
               </p>
-              <div className="mt-4">
-                <button
-                  type="button"
-                  onClick={onNavigateToAddIssue}
-                  className="min-h-[46px] px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-sm shadow-sm inline-flex items-center justify-center cursor-pointer"
-                >
-                  <span>Add Issue</span>
-                </button>
-              </div>
             </div>
-          ) : (
-            issues.map((iss) => {
-              const count = photoCounts[iss.id] || 0;
-              return (
-                <div
-                  key={iss.id}
-                  onClick={() => onOpenIssue(iss.id)}
-                  className="bg-white border-2 border-stone-300 hover:border-blue-600 rounded-xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all cursor-pointer select-none active:scale-[0.99] flex items-center justify-between gap-4"
-                  id={`issue-card-${iss.id}`}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') onOpenIssue(iss.id);
-                  }}
-                >
-                  <div className="flex items-start gap-3.5">
-                    <div className="px-3 py-2 bg-stone-900 text-white rounded-lg font-black text-sm tracking-wide shrink-0">
-                      Issue {iss.issueNumber}
-                    </div>
-                    <div>
-                      <h3 className="text-base font-bold text-stone-900 leading-tight">
-                        {iss.issueName || <span className="italic text-stone-400">Untitled Issue</span>}
-                      </h3>
-                      {iss.issueDescription && (
-                        <p className="text-xs text-stone-600 line-clamp-1 mt-1">
-                          {iss.issueDescription}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+            <span className="px-3 py-1 bg-stone-200 text-stone-800 rounded-lg text-xs font-bold">
+              {issues.length} {issues.length === 1 ? 'Issue' : 'Issues'}
+            </span>
+          </div>
 
-                  <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 border border-stone-200 rounded-lg text-xs font-bold text-stone-700">
-                    <Camera className="w-4 h-4 text-stone-500" />
-                    <span>
-                      {count} {count === 1 ? 'photo' : 'photos'}
-                    </span>
-                  </div>
+          {/* Full-Width Add Issue Button (Navigates to separate page) */}
+          <button
+            type="button"
+            onClick={onNavigateToAddIssue}
+            id="add-issue-btn"
+            className="w-full min-h-[56px] px-6 py-3.5 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-xl font-extrabold text-base tracking-wide shadow-md transition-all flex items-center justify-center border-2 border-blue-800 active:scale-[0.99] cursor-pointer"
+          >
+            <span>Add Issue</span>
+          </button>
+
+          {/* Issues List */}
+          <div className="mt-4 space-y-3">
+            {isLoadingIssues ? (
+              <div className="py-8 text-center text-stone-500">
+                <div className="w-6 h-6 border-2 border-blue-700 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                <p className="text-sm font-semibold">Loading issues...</p>
+              </div>
+            ) : issues.length === 0 ? (
+              <div className="py-10 px-4 text-center bg-stone-100 border-2 border-dashed border-stone-300 rounded-2xl">
+                <Layers className="w-10 h-10 text-stone-400 mx-auto mb-2" />
+                <h4 className="text-lg font-bold text-stone-800">No issues added yet</h4>
+                <p className="text-xs text-stone-600 mt-1 max-w-xs mx-auto">
+                  Tap the "Add Issue" button above to record findings, defects, and photos.
+                </p>
+                <div className="mt-4">
+                  <button
+                    type="button"
+                    onClick={onNavigateToAddIssue}
+                    className="min-h-[46px] px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-sm shadow-sm inline-flex items-center justify-center cursor-pointer"
+                  >
+                    <span>Add Issue</span>
+                  </button>
                 </div>
-              );
-            })
-          )}
+              </div>
+            ) : (
+              issues.map((iss) => {
+                const count = photoCounts[iss.id] || 0;
+                return (
+                  <div
+                    key={iss.id}
+                    onClick={() => onOpenIssue(iss.id)}
+                    className="bg-white border-2 border-stone-300 hover:border-blue-600 rounded-xl p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all cursor-pointer select-none active:scale-[0.99] flex items-center justify-between gap-4"
+                    id={`issue-card-${iss.id}`}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') onOpenIssue(iss.id);
+                    }}
+                  >
+                    <div className="flex items-start gap-3.5">
+                      <div className="px-3 py-2 bg-stone-900 text-white rounded-lg font-black text-sm tracking-wide shrink-0">
+                        Issue {iss.issueNumber}
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-stone-900 leading-tight">
+                          {iss.issueName || <span className="italic text-stone-400">Untitled Issue</span>}
+                        </h3>
+                        {iss.issueDescription && (
+                          <p className="text-xs text-stone-600 line-clamp-1 mt-1">
+                            {iss.issueDescription}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 border border-stone-200 rounded-lg text-xs font-bold text-stone-700">
+                      <Camera className="w-4 h-4 text-stone-500" />
+                      <span>
+                        {count} {count === 1 ? 'photo' : 'photos'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Delete Report Action (Bottom of Screen per spec) */}
       <div className="mt-12 pt-6 border-t-2 border-stone-200">
