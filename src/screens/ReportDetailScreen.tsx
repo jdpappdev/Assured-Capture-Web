@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   ArrowLeft,
   Save,
-  Plus,
   Trash2,
   Calendar,
   History,
@@ -18,7 +17,6 @@ import { InspectionHistoryModal } from '../components/InspectionHistoryModal';
 import {
   updateReport,
   deleteReport,
-  createIssue,
   subscribeIssues,
   getPhotosCountForIssue,
 } from '../services/reportService';
@@ -27,6 +25,7 @@ interface ReportDetailScreenProps {
   report: Report;
   onBack: () => void;
   onOpenIssue: (issueId: string) => void;
+  onNavigateToAddIssue: () => void;
   onReportDeleted: () => void;
 }
 
@@ -34,10 +33,12 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
   report,
   onBack,
   onOpenIssue,
+  onNavigateToAddIssue,
   onReportDeleted,
 }) => {
   // Form State
-  const [jobReference, setJobReference] = useState(report.jobReference);
+  const defaultRef = 'BBC-26-';
+  const [jobReference, setJobReference] = useState(report.jobReference || defaultRef);
   const [reportName, setReportName] = useState(report.reportName);
   const [clientName, setClientName] = useState(report.clientName);
   const [address, setAddress] = useState(report.address);
@@ -54,7 +55,6 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isCreatingIssue, setIsCreatingIssue] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
 
   // Sync props if report updates externally
   useEffect(() => {
-    setJobReference(report.jobReference);
+    setJobReference(report.jobReference || defaultRef);
     setReportName(report.reportName);
     setClientName(report.clientName);
     setAddress(report.address);
@@ -123,19 +123,6 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
       );
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handleAddIssue = async () => {
-    setIsCreatingIssue(true);
-    try {
-      const newIssue = await createIssue(report);
-      onOpenIssue(newIssue.id);
-    } catch (err: any) {
-      console.error('Failed to create issue:', err);
-      alert('Could not create issue. Please check your connection.');
-    } finally {
-      setIsCreatingIssue(false);
     }
   };
 
@@ -221,11 +208,11 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
             id="jobReference"
             value={jobReference}
             onChange={(e) => setJobReference(e.target.value)}
-            placeholder="BBC-26-90"
+            placeholder="BBC-26-"
             className="w-full min-h-[52px] px-4 py-3 bg-stone-50 border-2 border-stone-300 rounded-xl text-stone-900 font-bold text-lg focus:border-blue-700 focus:bg-white focus:outline-hidden"
           />
           <p className="text-xs text-stone-500 mt-1 font-medium">
-            Pre-fills with BBC-[YY]- format and remains editable.
+            Pre-fills with BBC-26- and remains editable.
           </p>
         </div>
 
@@ -393,25 +380,14 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
           </span>
         </div>
 
-        {/* Prominent Full-Width + Add Issue Button */}
+        {/* Full-Width Add Issue Button (Navigates to separate page) */}
         <button
           type="button"
-          onClick={handleAddIssue}
-          disabled={isCreatingIssue}
+          onClick={onNavigateToAddIssue}
           id="add-issue-btn"
-          className="w-full min-h-[56px] px-6 py-3.5 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-xl font-extrabold text-base tracking-wide shadow-md transition-all flex items-center justify-center gap-2.5 border-2 border-blue-800 active:scale-[0.99]"
+          className="w-full min-h-[56px] px-6 py-3.5 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-xl font-extrabold text-base tracking-wide shadow-md transition-all flex items-center justify-center border-2 border-blue-800 active:scale-[0.99] cursor-pointer"
         >
-          {isCreatingIssue ? (
-            <>
-              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Creating Issue...</span>
-            </>
-          ) : (
-            <>
-              <Plus className="w-6 h-6 stroke-[2.5]" />
-              <span>+ Add Issue</span>
-            </>
-          )}
+          <span>Add Issue</span>
         </button>
 
         {/* Issues List */}
@@ -426,8 +402,17 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
               <Layers className="w-10 h-10 text-stone-400 mx-auto mb-2" />
               <h4 className="text-lg font-bold text-stone-800">No issues added yet</h4>
               <p className="text-xs text-stone-600 mt-1 max-w-xs mx-auto">
-                Tap the "+ Add Issue" button above to record findings, defects, and photos.
+                Tap the "Add Issue" button above to record findings, defects, and photos.
               </p>
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={onNavigateToAddIssue}
+                  className="min-h-[46px] px-5 py-2.5 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-sm shadow-sm inline-flex items-center justify-center cursor-pointer"
+                >
+                  <span>Add Issue</span>
+                </button>
+              </div>
             </div>
           ) : (
             issues.map((iss) => {

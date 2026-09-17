@@ -60,7 +60,7 @@ export interface UploadTaskItem {
   photoId?: string;
 }
 
-export type ScreenName = 'reports_home' | 'report_detail' | 'issue_detail' | 'photo_detail';
+export type ScreenName = 'reports_home' | 'report_detail' | 'add_issue' | 'issue_detail' | 'photo_detail';
 
 export interface AppNavigation {
   screen: ScreenName;

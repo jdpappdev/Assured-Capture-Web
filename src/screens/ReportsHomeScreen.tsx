@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import {
-  Plus,
   Search,
   Calendar,
   User as UserIcon,
   MapPin,
   FileText,
   AlertCircle,
-  LogIn,
   LogOut,
+  Sparkles,
 } from 'lucide-react';
 import type { Report } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
 import { createReport } from '../services/reportService';
+import { seedDemoReports } from '../services/seedService';
 import { loginWithGoogle, logoutUser, type User } from '../firebase';
 
 interface ReportsHomeScreenProps {
@@ -33,6 +33,7 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   const handleCreateReport = async () => {
     setIsCreating(true);
@@ -45,6 +46,19 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
       setCreateError('Failed to create new report. Please check your network connection.');
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleLoadDemoReports = async () => {
+    setIsSeeding(true);
+    setCreateError(null);
+    try {
+      await seedDemoReports(currentUser?.uid);
+    } catch (err: any) {
+      console.error('Error adding demo reports:', err);
+      setCreateError('Failed to add demo reports. Please check your connection.');
+    } finally {
+      setIsSeeding(false);
     }
   };
 
@@ -89,13 +103,9 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
       {/* Top Header: App Title & User Auth */}
       <header className="flex items-center justify-between gap-4 pb-4 border-b border-stone-200">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight flex items-center gap-2.5">
-            <span className="w-4 h-4 rounded-full bg-blue-700 inline-block" />
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">
             Assured Capture
           </h1>
-          <p className="text-xs sm:text-sm font-medium text-stone-500 mt-0.5">
-            Field Inspection Photo Reports
-          </p>
         </div>
 
         {/* User Auth Control */}
@@ -133,35 +143,50 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
             <button
               type="button"
               onClick={handleGoogleAuth}
-              className="flex items-center gap-2 px-3 py-2 bg-white border border-stone-300 hover:bg-stone-50 text-stone-800 rounded-xl text-xs sm:text-sm font-semibold shadow-2xs transition-colors"
+              className="w-10 h-10 rounded-full bg-white border-2 border-stone-300 hover:border-blue-600 hover:bg-stone-50 flex items-center justify-center shadow-2xs transition-all active:scale-95 shrink-0"
               id="google-signin-btn"
+              title="Sign in with Google"
+              aria-label="Sign in with Google"
             >
-              <LogIn className="w-4 h-4 text-blue-700" />
-              <span>Google Sign-In</span>
+              <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                />
+              </svg>
             </button>
           )}
         </div>
       </header>
 
-      {/* Prominent + New Report Action (Outdoor/Gloved Sizing) */}
+      {/* Prominent New Report Action (Outdoor/Gloved Sizing) */}
       <div className="mt-5">
         <button
           type="button"
           onClick={handleCreateReport}
           disabled={isCreating}
           id="new-report-main-btn"
-          className="w-full min-h-[58px] px-6 py-4 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-xl font-extrabold text-lg tracking-wide shadow-md transition-all flex items-center justify-center gap-3 border-2 border-blue-800 active:scale-[0.99]"
+          className="w-full min-h-[58px] px-6 py-4 bg-blue-700 hover:bg-blue-800 active:bg-blue-900 text-white rounded-xl font-extrabold text-lg tracking-wide shadow-md transition-all flex items-center justify-center border-2 border-blue-800 active:scale-[0.99]"
         >
           {isCreating ? (
-            <>
+            <div className="flex items-center gap-3">
               <span className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full animate-spin" />
               <span>Creating Report...</span>
-            </>
+            </div>
           ) : (
-            <>
-              <Plus className="w-7 h-7 stroke-[2.5]" />
-              <span>+ New Report</span>
-            </>
+            <span>New Report</span>
           )}
         </button>
       </div>
@@ -209,6 +234,24 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
       {/* Scrollable Report Cards List */}
       {!isLoading && (
         <div className="mt-5 space-y-3.5 flex-1">
+          {filteredReports.length > 0 && (
+            <div className="flex items-center justify-between px-1 pb-1">
+              <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
+                {filteredReports.length} {filteredReports.length === 1 ? 'Report' : 'Reports'}
+              </span>
+              <button
+                type="button"
+                onClick={handleLoadDemoReports}
+                disabled={isSeeding}
+                className="text-xs font-bold text-stone-600 hover:text-blue-700 flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-stone-200 transition-colors cursor-pointer"
+                title="Populate complete demo reports with attached photos"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>{isSeeding ? 'Loading Demos...' : 'Load Demo Reports'}</span>
+              </button>
+            </div>
+          )}
+
           {filteredReports.length === 0 ? (
             /* Empty State */
             <div className="py-14 px-6 text-center bg-stone-100/70 border-2 border-dashed border-stone-300 rounded-2xl">
@@ -221,16 +264,26 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
                   ? `No inspection reports match "${searchQuery}". Clear your search or create a new report.`
                   : 'Start a photo inspection report to document site conditions and issues.'}
               </p>
-              <div className="mt-6">
+              <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
                   type="button"
                   onClick={handleCreateReport}
-                  disabled={isCreating}
-                  className="min-h-[50px] px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-base shadow-sm inline-flex items-center gap-2"
+                  disabled={isCreating || isSeeding}
+                  className="w-full sm:w-auto min-h-[50px] px-6 py-3 bg-blue-700 hover:bg-blue-800 text-white rounded-xl font-bold text-base shadow-sm inline-flex items-center justify-center"
                   id="empty-new-report-btn"
                 >
-                  <Plus className="w-5 h-5 stroke-[2.5]" />
-                  <span>+ New Report</span>
+                  <span>New Report</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLoadDemoReports}
+                  disabled={isCreating || isSeeding}
+                  className="w-full sm:w-auto min-h-[50px] px-5 py-3 bg-white hover:bg-stone-50 border-2 border-stone-300 text-stone-700 rounded-xl font-bold text-sm shadow-xs inline-flex items-center justify-center gap-2"
+                  id="empty-load-demo-btn"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>{isSeeding ? 'Loading Demo Reports...' : 'Add Demo Reports'}</span>
                 </button>
               </div>
             </div>

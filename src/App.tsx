@@ -11,8 +11,10 @@ import {
   subscribeIssues,
   subscribePhotos,
 } from './services/reportService';
+import { seedDemoReports } from './services/seedService';
 import { ReportsHomeScreen } from './screens/ReportsHomeScreen';
 import { ReportDetailScreen } from './screens/ReportDetailScreen';
+import { AddIssueScreen } from './screens/AddIssueScreen';
 import { IssueDetailScreen } from './screens/IssueDetailScreen';
 import { PhotoDetailScreen } from './screens/PhotoDetailScreen';
 
@@ -45,14 +47,26 @@ export default function App() {
     return () => unsubAuth();
   }, []);
 
-  // 2. Subscribe to Reports collection
+  // 2. Subscribe to Reports collection and auto-seed demo reports if empty
   useEffect(() => {
     setIsLoadingReports(true);
+    let hasCheckedForSeed = false;
+
     const unsubscribe = subscribeReports(
-      (fetchedReports) => {
+      async (fetchedReports) => {
         setReports(fetchedReports);
         setIsLoadingReports(false);
         setReportsError(null);
+
+        // If the database has 0 reports, automatically seed the two complete demo reports with photos
+        if (!hasCheckedForSeed && fetchedReports.length === 0) {
+          hasCheckedForSeed = true;
+          try {
+            await seedDemoReports(currentUser?.uid);
+          } catch (seedErr) {
+            console.warn('Initial demo seed notice:', seedErr);
+          }
+        }
       },
       (err) => {
         console.error('Reports subscription error:', err);
@@ -62,7 +76,7 @@ export default function App() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   // 3. Subscribe to Issues if inside a Report
   useEffect(() => {
@@ -106,6 +120,13 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleNavigateToAddIssue = () => {
+    setActiveIssueId(null);
+    setActivePhotoId(null);
+    setCurrentScreen('add_issue');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleOpenIssue = (issueId: string) => {
     setActiveIssueId(issueId);
     setActivePhotoId(null);
@@ -122,6 +143,7 @@ export default function App() {
   // Back navigation hierarchy per Section 22:
   // Photo Detail → Issue Detail
   // Issue Detail → Report Detail
+  // Add Issue → Report Detail
   // Report Detail → Reports Home
   const handleBackToReports = () => {
     setActiveReportId(null);
@@ -163,11 +185,23 @@ export default function App() {
           report={activeReport}
           onBack={handleBackToReports}
           onOpenIssue={handleOpenIssue}
+          onNavigateToAddIssue={handleNavigateToAddIssue}
           onReportDeleted={handleBackToReports}
         />
       )}
 
-      {/* Screen 3: Issue Detail */}
+      {/* Screen 3: Add Issue (Separate Page) */}
+      {currentScreen === 'add_issue' && activeReport && (
+        <AddIssueScreen
+          report={activeReport}
+          onBack={handleBackToReport}
+          onIssueCreated={(newIssueId) => {
+            handleOpenIssue(newIssueId);
+          }}
+        />
+      )}
+
+      {/* Screen 4: Issue Detail */}
       {currentScreen === 'issue_detail' && activeReport && activeIssue && (
         <IssueDetailScreen
           report={activeReport}
@@ -178,7 +212,7 @@ export default function App() {
         />
       )}
 
-      {/* Screen 4: Photo Detail / Edit */}
+      {/* Screen 5: Photo Detail / Edit */}
       {currentScreen === 'photo_detail' && activeReport && activeIssue && activePhoto && (
         <PhotoDetailScreen
           report={activeReport}

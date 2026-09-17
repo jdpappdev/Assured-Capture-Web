@@ -51,11 +51,10 @@ export function cleanPayload<T extends Record<string, any>>(obj: T): Record<stri
   return result;
 }
 
-// Generate BBC-[YY]-XX default job reference
+// Generate BBC-[YY]- default job reference (prefills with BBC-26- only)
 export function generateDefaultJobReference(): string {
   const currentYear = new Date().getFullYear().toString().slice(-2); // e.g. "26"
-  const randomSuffix = Math.floor(10 + Math.random() * 89); // 2-digit number e.g. 90
-  return `BBC-${currentYear}-${randomSuffix}`;
+  return `BBC-${currentYear}-`;
 }
 
 export function formatCurrentDate(): string {
@@ -235,7 +234,10 @@ export function subscribeIssues(
  * Once assigned, permanently retired if deleted.
  * Never reuse numbers from deleted issues.
  */
-export async function createIssue(report: Report): Promise<Issue> {
+export async function createIssue(
+  report: Report,
+  initialData?: { issueName?: string; issueDescription?: string }
+): Promise<Issue> {
   const issuesCol = collection(db, 'reports', report.id, 'issues');
   const issuesSnap = await getDocs(issuesCol);
   
@@ -254,8 +256,8 @@ export async function createIssue(report: Report): Promise<Issue> {
     id: issueId,
     reportId: report.id,
     issueNumber: nextIssueNumber,
-    issueName: '',
-    issueDescription: '',
+    issueName: initialData?.issueName?.trim() || '',
+    issueDescription: initialData?.issueDescription?.trim() || '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };

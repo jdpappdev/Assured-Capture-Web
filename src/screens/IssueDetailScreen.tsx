@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { Report, Issue, Photo, UploadTaskItem } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { VoiceTranscriber } from '../components/VoiceTranscriber';
 import {
   updateIssue,
   deleteIssue,
@@ -372,12 +373,17 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
         </div>
 
         <div>
-          <label
-            htmlFor="issueDescription"
-            className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1"
-          >
-            Issue Description
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label
+              htmlFor="issueDescription"
+              className="text-xs font-bold uppercase tracking-wider text-stone-700"
+            >
+              Issue Description
+            </label>
+            <span className="text-[11px] font-medium text-stone-400">
+              Type or speak below
+            </span>
+          </div>
           <textarea
             id="issueDescription"
             rows={3}
@@ -386,6 +392,14 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
             placeholder="Document detailed observations, measurements, severity, or remediation recommendations..."
             className="w-full p-4 bg-stone-50 border-2 border-stone-300 rounded-xl text-stone-900 font-medium text-base focus:border-blue-700 focus:bg-white focus:outline-hidden"
           />
+
+          {/* Voice to text widget for issue description */}
+          <div className="mt-2">
+            <VoiceTranscriber
+              currentText={issueDescription}
+              onTranscript={(newText) => setIssueDescription(newText)}
+            />
+          </div>
         </div>
 
         <button
