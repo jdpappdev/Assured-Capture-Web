@@ -3,7 +3,8 @@
   "description": "Minimalist photo inspection report tool for field inspectors with high contrast, large touch targets, Firestore persistence, and reliable photo management.",
   "requestFramePermissions": [
     "camera",
-    "microphone"
+    "microphone",
+    "geolocation"
   ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

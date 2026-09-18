@@ -28,6 +28,7 @@ import type {
   Photo,
   InspectionDateHistoryRecord,
 } from '../types';
+import { optimizeInspectionImage } from './imageOptimizer';
 
 // Helper to generate IDs
 export function generateId(): string {
@@ -228,6 +229,29 @@ export function subscribeIssues(
   );
 }
 
+export async function getIssuesForReport(reportId: string): Promise<Issue[]> {
+  try {
+    const issuesCol = collection(db, 'reports', reportId, 'issues');
+    const q = query(issuesCol, orderBy('issueNumber', 'asc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        reportId,
+        issueNumber: data.issueNumber,
+        issueName: data.issueName || '',
+        issueDescription: data.issueDescription || '',
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      };
+    });
+  } catch (err) {
+    console.error(`Failed to get issues for report ${reportId}:`, err);
+    return [];
+  }
+}
+
 /**
  * Creates a new Issue with permanent sequential issue numbering.
  * Rule: Next unused issue number within the report.
@@ -383,6 +407,50 @@ export async function getPhotosCountForIssue(
   }
 }
 
+export async function getPhotosForIssue(
+  reportId: string,
+  issueId: string
+): Promise<Photo[]> {
+  try {
+    const photosCol = collection(db, 'reports', reportId, 'issues', issueId, 'photos');
+    const q = query(photosCol, orderBy('createdAt', 'asc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((d) => {
+      const data = d.data();
+      return {
+        id: d.id,
+        reportId,
+        issueId,
+        imageFile: data.imageFile || '',
+        description: data.description || '',
+        isReferenceImage: Boolean(data.isReferenceImage),
+        issueNumber: data.issueNumber,
+        jobReference: data.jobReference || '',
+        storagePath: data.storagePath || '',
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+      };
+    });
+  } catch (err) {
+    console.error(`Failed to get photos for issue ${issueId}:`, err);
+    return [];
+  }
+}
+
+export async function getFullReportBundle(report: Report): Promise<{
+  report: Report;
+  issuesWithPhotos: Array<{ issue: Issue; photos: Photo[] }>;
+}> {
+  const issues = await getIssuesForReport(report.id);
+  const issuesWithPhotos = await Promise.all(
+    issues.map(async (issue) => {
+      const photos = await getPhotosForIssue(report.id, issue.id);
+      return { issue, photos };
+    })
+  );
+  return { report, issuesWithPhotos };
+}
+
 export async function createPhoto(
   reportId: string,
   issueId: string,
@@ -496,8 +564,12 @@ export function fileToDataUrl(file: File): Promise<string> {
 }
 
 /**
- * Uploads a single image to Firebase Storage with progress tracking.
- * If Storage upload fails, falls back gracefully to resilient dataUrl so field inspector data is never lost.
+ * Uploads/processes an inspection image for persistent storage in the report.
+ * Automatically downscales large phone camera & gallery photos to crisp inspection specs
+ * and compresses them to ~100KB-350KB JPEG data so that:
+ * 1. It never exceeds Firestore's 1MB limit.
+ * 2. It does not hang or timeout on unprovisioned cloud storage buckets.
+ * 3. It syncs instantly across devices and renders immediately.
  */
 export async function uploadImageFile(
   file: File,
@@ -508,56 +580,31 @@ export async function uploadImageFile(
   const timestamp = Date.now();
   const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
   const storagePath = `reports/${reportId}/issues/issue_${issueNumber}/${timestamp}_${cleanName}`;
-  const storageRef = ref(storage, storagePath);
+
+  if (onProgress) onProgress(25);
 
   try {
-    const uploadTask = uploadBytesResumable(storageRef, file);
+    // 1. Optimize image to ensure clean dimensions (max 1400px) and safe payload size (<650KB)
+    const optimized = await optimizeInspectionImage(file, 1400, 0.78);
+    if (onProgress) onProgress(75);
 
-    return await new Promise((resolve, reject) => {
-      uploadTask.on(
-        'state_changed',
-        (snapshot) => {
-          const progress = Math.round(
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-          );
-          if (onProgress) onProgress(progress);
-        },
-        async (error) => {
-          console.warn('Firebase Storage upload error, using local fallback:', error);
-          try {
-            const fallbackUrl = await fileToDataUrl(file);
-            if (onProgress) onProgress(100);
-            resolve({
-              downloadUrl: fallbackUrl,
-              storagePath: `fallback://${storagePath}`,
-            });
-          } catch (fbErr) {
-            reject(error);
-          }
-        },
-        async () => {
-          try {
-            const downloadUrl = await getDownloadURL(uploadTask.snapshot.ref);
-            if (onProgress) onProgress(100);
-            resolve({ downloadUrl, storagePath });
-          } catch (urlErr) {
-            console.warn('Could not retrieve download URL, using data URL fallback:', urlErr);
-            const fallbackUrl = await fileToDataUrl(file);
-            resolve({
-              downloadUrl: fallbackUrl,
-              storagePath: `fallback://${storagePath}`,
-            });
-          }
-        }
-      );
-    });
-  } catch (err) {
-    console.warn('Direct upload failed, providing local dataUrl fallback:', err);
-    const fallbackUrl = await fileToDataUrl(file);
+    // 2. Deliver the optimized dataUrl directly for Firestore persistence
     if (onProgress) onProgress(100);
     return {
-      downloadUrl: fallbackUrl,
-      storagePath: `fallback://${storagePath}`,
+      downloadUrl: optimized.dataUrl,
+      storagePath: `inline://${storagePath}`,
     };
+  } catch (err: any) {
+    console.warn('Image optimization encountered issue, falling back to dataUrl:', err);
+    try {
+      const fallbackUrl = await fileToDataUrl(file);
+      if (onProgress) onProgress(100);
+      return {
+        downloadUrl: fallbackUrl,
+        storagePath: `fallback://${storagePath}`,
+      };
+    } catch (fbErr: any) {
+      throw new Error(`Failed to process image "${file.name}": ${err?.message || 'Unsupported format'}`);
+    }
   }
 }

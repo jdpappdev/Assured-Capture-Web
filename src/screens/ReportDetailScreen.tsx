@@ -9,6 +9,10 @@ import {
   Check,
   Camera,
   Layers,
+  MapPin,
+  Loader2,
+  Navigation,
+  FileDown,
 } from 'lucide-react';
 import type { Report, Issue, ReportStatus } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
@@ -19,7 +23,9 @@ import {
   deleteReport,
   subscribeIssues,
   getPhotosCountForIssue,
+  getFullReportBundle,
 } from '../services/reportService';
+import { exportReportToDocx } from '../services/docxExportService';
 
 interface ReportDetailScreenProps {
   report: Report;
@@ -63,6 +69,12 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  // Location Widget State
+  const [isPinningLocation, setIsPinningLocation] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<string | null>(null);
 
   // Sync props if report updates externally
   useEffect(() => {
@@ -98,6 +110,92 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
 
     return () => unsubscribe();
   }, [report.id]);
+
+  const handlePinLocation = () => {
+    if (!('geolocation' in navigator)) {
+      setLocationStatus('Geolocation is not supported by your browser.');
+      setTimeout(() => setLocationStatus(null), 4000);
+      return;
+    }
+
+    setIsPinningLocation(true);
+    setLocationStatus('Acquiring GPS location...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setLocationStatus('Resolving site address...');
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
+            {
+              headers: { Accept: 'application/json' },
+              signal: controller.signal,
+            }
+          );
+          clearTimeout(timeoutId);
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.address) {
+              const a = data.address;
+              const streetNumber = a.house_number || '';
+              const road = a.road || a.pedestrian || a.street || a.residential || '';
+              const street = [streetNumber, road].filter(Boolean).join(' ');
+              const suburb = a.suburb || a.neighbourhood || a.city_district || '';
+              const city = a.city || a.town || a.village || a.municipality || a.county || '';
+              const postcode = a.postcode || '';
+              const country = a.country || '';
+
+              const parts = [street, suburb, city, postcode, country].filter(Boolean);
+              const formattedAddress = parts.length > 0 ? parts.join(', ') : data.display_name;
+
+              if (formattedAddress) {
+                setAddress(formattedAddress);
+                setLocationStatus(`Location pinned: ${formattedAddress}`);
+                setTimeout(() => setLocationStatus(null), 4000);
+                setIsPinningLocation(false);
+                return;
+              }
+            } else if (data && data.display_name) {
+              setAddress(data.display_name);
+              setLocationStatus(`Location pinned: ${data.display_name}`);
+              setTimeout(() => setLocationStatus(null), 4000);
+              setIsPinningLocation(false);
+              return;
+            }
+          }
+        } catch (geocodeErr) {
+          console.warn('Reverse geocoding error or timeout:', geocodeErr);
+        }
+
+        // Fallback to coordinates
+        const gpsCoords = `GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        setAddress(gpsCoords);
+        setLocationStatus(`Location pinned: ${gpsCoords}`);
+        setTimeout(() => setLocationStatus(null), 4000);
+        setIsPinningLocation(false);
+      },
+      (err) => {
+        setIsPinningLocation(false);
+        let msg = 'Could not retrieve GPS location.';
+        if (err.code === 1) msg = 'Location access was denied. Please allow location permissions in your browser.';
+        else if (err.code === 2) msg = 'GPS position unavailable. Please check your signal.';
+        else if (err.code === 3) msg = 'GPS location request timed out. Please try again.';
+        setLocationStatus(msg);
+        setTimeout(() => setLocationStatus(null), 5000);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000,
+      }
+    );
+  };
 
   const handleSaveReport = async () => {
     setIsSaving(true);
@@ -149,6 +247,30 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
     }
   };
 
+  const handleExportDocx = async () => {
+    setIsExporting(true);
+    setExportError(null);
+    try {
+      const bundle = await getFullReportBundle({
+        ...report,
+        jobReference,
+        reportName,
+        clientName,
+        address,
+        reportDate,
+        status,
+        inspectionDate,
+      });
+      await exportReportToDocx(bundle.report, bundle.issuesWithPhotos);
+    } catch (err: any) {
+      console.error('Failed to export DOCX:', err);
+      setExportError(`Export failed: ${err?.message || 'Please try again'}`);
+      setTimeout(() => setExportError(null), 6000);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const allowedStatuses: ReportStatus[] = [
     'Draft',
     'In Progress',
@@ -174,6 +296,28 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
 
           <div className="flex items-center gap-2">
             <StatusBadge status={status} size="sm" />
+            {!isNewReport && (
+              <button
+                type="button"
+                onClick={handleExportDocx}
+                disabled={isExporting}
+                id="detail-export-docx-btn"
+                title="Export complete report details and photo sheets as DOCX"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-blue-50 active:bg-blue-100 border border-stone-300 hover:border-blue-400 text-stone-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-60"
+              >
+                {isExporting ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-700" />
+                    <span>Exporting...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-3.5 h-3.5 text-blue-700" />
+                    <span>Export DOCX</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
 
@@ -186,6 +330,14 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
           </h1>
         </div>
       </div>
+
+      {/* Export Error Banner */}
+      {exportError && (
+        <div className="mt-4 p-3.5 bg-red-50 border-2 border-red-300 rounded-xl text-red-900 text-sm font-semibold flex items-center gap-2 animate-fadeIn">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+          <span>{exportError}</span>
+        </div>
+      )}
 
       {/* Save Feedback Banner */}
       {saveSuccess && (
@@ -284,22 +436,64 @@ export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({
           </div>
         </div>
 
-        {/* Address */}
+        {/* Address with Location Button Widget */}
         <div>
-          <label
-            htmlFor="address"
-            className="block text-xs font-bold uppercase tracking-wider text-stone-700 mb-1"
-          >
-            Site Address
-          </label>
-          <input
-            type="text"
-            id="address"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="e.g., 42 High Street, Birmingham, B1 1BB"
-            className="w-full min-h-[52px] px-4 py-3 bg-stone-50 border-2 border-stone-300 rounded-xl text-stone-900 font-medium text-base focus:border-blue-700 focus:bg-white focus:outline-hidden"
-          />
+          <div className="flex items-center justify-between mb-1.5">
+            <label
+              htmlFor="address"
+              className="block text-xs font-bold uppercase tracking-wider text-stone-700"
+            >
+              Site Address
+            </label>
+            <button
+              type="button"
+              onClick={handlePinLocation}
+              disabled={isPinningLocation}
+              id="pin-location-header-btn"
+              title="Pin current GPS location to automatically populate site address"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 active:bg-blue-200 border border-blue-200 text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer disabled:opacity-60"
+            >
+              {isPinningLocation ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-700" />
+              ) : (
+                <MapPin className="w-3.5 h-3.5 text-blue-700" />
+              )}
+              <span>{isPinningLocation ? 'Locating...' : 'Pin Location'}</span>
+            </button>
+          </div>
+
+          <div className="relative flex items-center">
+            <input
+              type="text"
+              id="address"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="e.g., 42 High Street, Birmingham, B1 1BB or pin GPS location"
+              className="w-full min-h-[52px] pl-4 pr-12 py-3 bg-stone-50 border-2 border-stone-300 rounded-xl text-stone-900 font-medium text-base focus:border-blue-700 focus:bg-white focus:outline-hidden"
+            />
+            <button
+              type="button"
+              onClick={handlePinLocation}
+              disabled={isPinningLocation}
+              id="pin-location-widget-btn"
+              aria-label="Pin current location"
+              title="Pin current location"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-stone-500 hover:text-blue-700 hover:bg-stone-200/70 active:bg-blue-100 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {isPinningLocation ? (
+                <Loader2 className="w-5 h-5 animate-spin text-blue-700" />
+              ) : (
+                <MapPin className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+
+          {locationStatus && (
+            <div className="mt-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-semibold text-blue-800 flex items-center gap-1.5">
+              <Navigation className="w-3.5 h-3.5 shrink-0 text-blue-600" />
+              <span className="truncate">{locationStatus}</span>
+            </div>
+          )}
         </div>
 
         {/* Report Date & Inspection Date */}

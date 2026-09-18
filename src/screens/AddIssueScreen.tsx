@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, AlertCircle, Layers, FileText } from 'lucide-react';
 import type { Report, Issue } from '../types';
 import { createIssue, subscribeIssues } from '../services/reportService';
-import { VoiceTranscriber } from '../components/VoiceTranscriber';
 
 interface AddIssueScreenProps {
   report: Report;
@@ -140,9 +139,6 @@ export const AddIssueScreen: React.FC<AddIssueScreenProps> = ({
                 <FileText className="w-4 h-4 text-stone-500" />
                 <span>Issue Description</span>
               </label>
-              <span className="text-[11px] font-medium text-stone-400">
-                Type or speak below
-              </span>
             </div>
             <textarea
               id="add-issue-description"
@@ -152,14 +148,6 @@ export const AddIssueScreen: React.FC<AddIssueScreenProps> = ({
               placeholder="Document detailed observations, defect extent, severity, or remediation recommendations..."
               className="w-full p-4 bg-stone-50 border-2 border-stone-300 rounded-xl text-stone-900 font-medium text-base focus:border-blue-700 focus:bg-white focus:outline-hidden leading-relaxed"
             />
-
-            {/* Voice to text widget */}
-            <div className="mt-2">
-              <VoiceTranscriber
-                currentText={issueDescription}
-                onTranscript={(newText) => setIssueDescription(newText)}
-              />
-            </div>
           </div>
         </div>
 

@@ -60,7 +60,22 @@ export interface UploadTaskItem {
   photoId?: string;
 }
 
-export type ScreenName = 'reports_home' | 'report_detail' | 'add_issue' | 'issue_detail' | 'photo_detail';
+export type ScreenName =
+  | 'reports_home'
+  | 'report_detail'
+  | 'add_issue'
+  | 'issue_detail'
+  | 'photo_detail'
+  | 'profile_settings';
+
+export interface InspectorProfile {
+  displayName: string;
+  email?: string;
+  photoURL?: string;
+  title?: string;
+  company?: string;
+  updatedAt?: string;
+}
 
 export interface AppNavigation {
   screen: ScreenName;

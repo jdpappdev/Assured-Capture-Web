@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import type { Report, Issue, Photo, UploadTaskItem } from '../types';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { VoiceTranscriber } from '../components/VoiceTranscriber';
 import {
   updateIssue,
   deleteIssue,
@@ -114,7 +113,7 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
   };
 
   // MULTI-IMAGE UPLOAD ENGINE (Section 13)
-  const handleFilesSelected = async (files: FileList | null) => {
+  const handleFilesSelected = async (files: FileList | File[] | null) => {
     if (!files || files.length === 0) return;
 
     const newTasks: UploadTaskItem[] = Array.from(files).map((file, idx) => ({
@@ -232,9 +231,12 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
 
   // In-Browser Live Camera Capture (for devices without native capture input)
   const openDirectCamera = async () => {
-    // Try device camera input first on mobile
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile && cameraInputRef.current) {
+    // Try device camera input first on mobile and touch tablets (including iPadOS)
+    const isTouchOrMobile =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (typeof navigator !== 'undefined' && 'maxTouchPoints' in navigator && navigator.maxTouchPoints > 1);
+
+    if (isTouchOrMobile && cameraInputRef.current) {
       cameraInputRef.current.click();
       return;
     }
@@ -275,9 +277,7 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
       (blob) => {
         if (blob) {
           const file = new File([blob], `capture_${Date.now()}.jpg`, { type: 'image/jpeg' });
-          const dt = new DataTransfer();
-          dt.items.add(file);
-          handleFilesSelected(dt.files);
+          handleFilesSelected([file]);
         }
         closeCameraModal();
       },
@@ -380,9 +380,6 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
             >
               Issue Description
             </label>
-            <span className="text-[11px] font-medium text-stone-400">
-              Type or speak below
-            </span>
           </div>
           <textarea
             id="issueDescription"
@@ -392,14 +389,6 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
             placeholder="Document detailed observations, measurements, severity, or remediation recommendations..."
             className="w-full p-4 bg-stone-50 border-2 border-stone-300 rounded-xl text-stone-900 font-medium text-base focus:border-blue-700 focus:bg-white focus:outline-hidden"
           />
-
-          {/* Voice to text widget for issue description */}
-          <div className="mt-2">
-            <VoiceTranscriber
-              currentText={issueDescription}
-              onTranscript={(newText) => setIssueDescription(newText)}
-            />
-          </div>
         </div>
 
         <button
@@ -435,7 +424,12 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
           ref={galleryInputRef}
           accept="image/*"
           multiple
-          onChange={(e) => handleFilesSelected(e.target.files)}
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              handleFilesSelected(e.target.files);
+            }
+            e.target.value = '';
+          }}
           className="hidden"
           id="gallery-input"
         />
@@ -445,7 +439,12 @@ export const IssueDetailScreen: React.FC<IssueDetailScreenProps> = ({
           ref={cameraInputRef}
           accept="image/*"
           capture="environment"
-          onChange={(e) => handleFilesSelected(e.target.files)}
+          onChange={(e) => {
+            if (e.target.files && e.target.files.length > 0) {
+              handleFilesSelected(e.target.files);
+            }
+            e.target.value = '';
+          }}
           className="hidden"
           id="camera-input"
         />

@@ -7,10 +7,13 @@ import {
   FileText,
   AlertCircle,
   LogOut,
+  FileDown,
+  Loader2,
 } from 'lucide-react';
 import type { Report } from '../types';
 import { StatusBadge } from '../components/StatusBadge';
-import { createReport } from '../services/reportService';
+import { createReport, getFullReportBundle } from '../services/reportService';
+import { exportReportToDocx } from '../services/docxExportService';
 import { loginWithGoogle, logoutUser, type User } from '../firebase';
 
 interface ReportsHomeScreenProps {
@@ -31,6 +34,28 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [exportingReportId, setExportingReportId] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+
+  const handleExportDocx = async (e: React.MouseEvent, report: Report) => {
+    e.stopPropagation(); // Prevent navigating to report details
+    setExportingReportId(report.id);
+    setExportError(null);
+    try {
+      const bundle = await getFullReportBundle(report);
+      await exportReportToDocx(bundle.report, bundle.issuesWithPhotos);
+    } catch (err: any) {
+      console.error('Failed to export DOCX:', err);
+      setExportError(
+        `Export failed for "${report.reportName || report.jobReference}": ${
+          err?.message || 'Please check your connection and try again.'
+        }`
+      );
+      setTimeout(() => setExportError(null), 6000);
+    } finally {
+      setExportingReportId(null);
+    }
+  };
 
   const handleCreateReport = async () => {
     setIsCreating(true);
@@ -215,6 +240,16 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
         </div>
       )}
 
+      {exportError && (
+        <div className="mt-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-xl text-amber-950 text-sm flex items-start gap-2.5">
+          <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="font-bold">Export Notice</p>
+            <p className="text-xs text-amber-900 mt-0.5">{exportError}</p>
+          </div>
+        </div>
+      )}
+
       {/* Scrollable Report Cards List */}
       {!isLoading && (
         <div className="mt-5 space-y-3.5 flex-1">
@@ -304,12 +339,38 @@ export const ReportsHomeScreen: React.FC<ReportsHomeScreenProps> = ({
                   </div>
                 </div>
 
-                {report.address && (
-                  <div className="mt-2 text-xs text-stone-500 flex items-center gap-1.5 truncate">
-                    <MapPin className="w-3.5 h-3.5 shrink-0 text-stone-400" />
-                    <span className="truncate">{report.address}</span>
-                  </div>
-                )}
+                {/* Bottom Row / Lower Right Corner: Address on left, Export DOCX Button in lower right corner */}
+                <div className="mt-3 pt-3 border-t border-stone-100 flex items-center justify-between gap-3">
+                  {report.address ? (
+                    <div className="text-xs text-stone-500 flex items-center gap-1.5 truncate min-w-0">
+                      <MapPin className="w-3.5 h-3.5 shrink-0 text-stone-400" />
+                      <span className="truncate">{report.address}</span>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-stone-400 italic">No address specified</div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleExportDocx(e, report)}
+                    disabled={exportingReportId === report.id}
+                    id={`export-docx-${report.id}`}
+                    title="Export complete report details with photos in DOCX format"
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 bg-stone-100 hover:bg-blue-50 active:bg-blue-100 border border-stone-300 hover:border-blue-400 text-stone-700 hover:text-blue-700 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-60"
+                  >
+                    {exportingReportId === report.id ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-700" />
+                        <span>Exporting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileDown className="w-3.5 h-3.5 text-blue-700" />
+                        <span>Export DOCX</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             ))
           )}
